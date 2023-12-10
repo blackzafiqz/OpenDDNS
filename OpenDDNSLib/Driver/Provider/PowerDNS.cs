@@ -11,17 +11,20 @@ namespace OpenDDNSLib.Driver.Provider
     {
         private readonly PowerDnsApi.PowerDnsApi _api;
         private readonly string _server;
+        private readonly HttpClient _httpClient;
+        private readonly string _apiKey;
         public PowerDns(HttpClient httpClient, string baseUrl, string apiKey, string server)
         {
-            var httpClient1 = httpClient;
-            _api = new PowerDnsApi.PowerDnsApi(httpClient1);
+            _httpClient = httpClient;
+            _api = new PowerDnsApi.PowerDnsApi(_httpClient);
             _api.BaseUrl = baseUrl;
             _server = server;
-            httpClient1.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+            _apiKey = apiKey;
 
         }
         public async Task<bool> UpdateRecord(string domainName, string subdomainName, string ipAddress, RecordType recordType)
         {
+            _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
             try
             {
                 Zone zone = new()
@@ -47,7 +50,7 @@ namespace OpenDDNSLib.Driver.Provider
                 };
                 await _api.PatchZoneAsync(_server, domainName, zone);
             }
-            catch(ApiException e)
+            catch (ApiException e)
             {
                 Console.WriteLine(e);
                 return false;
@@ -57,7 +60,11 @@ namespace OpenDDNSLib.Driver.Provider
                 Console.WriteLine(e);
                 return false;
             }
-            
+            finally
+            {
+                _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
+            }
+
             return true;
         }
     }
