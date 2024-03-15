@@ -33,7 +33,7 @@ namespace OpenDDNSLib.Driver.Provider
                     {
                         new RRSet()
                         {
-                            Name = $"{subdomainName}.{domainName}.",
+                            Name = $"{(subdomainName is not ("@" or "") ? subdomainName+"." : "")}{domainName}.",
                             Type = recordType == RecordType.A ? "A" : "AAAA",
                             Ttl = 300,
                             Changetype = "REPLACE",
