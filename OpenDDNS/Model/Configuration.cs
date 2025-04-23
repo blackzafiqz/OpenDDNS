@@ -7,7 +7,8 @@ public class Configuration
     }
 
     public Configuration(string provider, string domain, List<string> subDomain, string? username, string? password,
-        List<string>? extraParameters, bool pv6, bool pv4, string ipv4Resolver, string ipv6Resolver,int interval)
+        List<string>? extraParameters, bool pv6, bool pv4, string ipv4Resolver, string ipv6Resolver,int interval, 
+        List<string> dnsServers)
     {
         Provider = provider;
         Domain = domain;
@@ -20,6 +21,7 @@ public class Configuration
         IPv4Resolver = ipv4Resolver;
         IPv6Resolver = ipv6Resolver;
         Interval = interval;
+        DnsServers = dnsServers;
     }
 
     public string Provider { get; set; }
@@ -32,5 +34,7 @@ public class Configuration
     public bool IPv4 { get; set; } = true;
     public string IPv4Resolver { get; set; } = "https://api.ipify.org";
     public string IPv6Resolver { get; set; } = "https://api64.ipify.org";
+
+    public List<string> DnsServers { get; set; } = ["1.1.1.1"];
     public int Interval { get; set; } = 300;
 }
