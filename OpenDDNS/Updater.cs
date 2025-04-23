@@ -63,34 +63,36 @@ public class Updater : BackgroundService
                     {
                         if (addressList.Where(x => x.AddressFamily == AddressFamily.InterNetworkV6)
                             .Any(x => x.ToString() == ipv6Address))
-                        {
                             Console.WriteLine($"IPv6 address already up to date for {subDomain}.{_config.Domain} : {ipv6Address}");
-                            continue;
+                        
+                        else
+                        {
+                            Console.WriteLine($"Updating IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
+
+                            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv6Address,
+                                RecordType.AAAA);
+
+                            Console.WriteLine(res
+                                ? $"Updated IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}"
+                                : $"Failed to update IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
                         }
-                        Console.WriteLine($"Updating IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
-
-                        var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv6Address,
-                            RecordType.AAAA);
-
-                        Console.WriteLine(res
-                            ? $"Updated IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}"
-                            : $"Failed to update IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
                     }
 
                     if (_config.IPv4 && ipv4AddressValid)
                     {
                         if (addressList.Where(x => x.AddressFamily == AddressFamily.InterNetwork)
                             .Any(x => x.ToString() == ipv4Address))
-                        {
                             Console.WriteLine($"IPv4 address already up to date for {subDomain}.{_config.Domain} : {ipv4Address}");
-                            continue;
+
+                        else
+                        {
+                            Console.WriteLine($"Updating IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
+                            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv4Address,
+                                RecordType.A);
+                            Console.WriteLine(res
+                                ? $"Updated IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}"
+                                : $"Failed to update IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
                         }
-                        Console.WriteLine($"Updating IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
-                        var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv4Address,
-                            RecordType.A);
-                        Console.WriteLine(res
-                            ? $"Updated IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}"
-                            : $"Failed to update IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
                     }
                 }
             }
