@@ -1,16 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace OpenDDNSLib.Driver.Provider;
 
-namespace OpenDDNSLib.Driver.Provider
+public class Rfc2136 : IProvider
 {
-    public class Rfc2136 : IProvider
+    public Task<bool> UpdateRecord(string domainName, string subdomainName, string ipAddress, RecordType recordType)
     {
-        public Task<bool> UpdateRecord(string domainName, string subdomainName, string ipAddress,RecordType recordType)
-        {
-            throw new NotImplementedException();
-        }
+        throw new NotImplementedException();
     }
 }

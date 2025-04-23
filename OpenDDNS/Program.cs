@@ -1,27 +1,16 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenDDNS.Model;
-using OpenDDNSLib.Driver.Provider;
-using System;
-using System.Net;
-using System.Net.Sockets;
-using Microsoft.Extensions.Configuration;
-using YamlDotNet.Serialization;
 
-namespace OpenDDNS
+namespace OpenDDNS;
+
+internal static class Program
 {
-    internal class Program
+    private static async Task Main(string[] args)
     {
-        
-        static async Task Main(string[] args)
-        {
-            HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
-            builder.Services.AddHttpClient();
-            builder.Services.AddHostedService<Updater>();
-            var host = builder.Build();
-            await host.RunAsync();
-        }
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.Services.AddHttpClient();
+        builder.Services.AddHostedService<Updater>();
+        var host = builder.Build();
+        await host.RunAsync();
     }
-
-
 }
