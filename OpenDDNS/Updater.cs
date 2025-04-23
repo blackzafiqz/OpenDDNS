@@ -60,9 +60,13 @@ public class Updater : BackgroundService
                 {
                     var addressList = await Dns.GetHostAddressesAsync($"{subDomain}.{_config.Domain}",cancellationToken:CancellationToken.None);
                     if (_config.IPv6 && ipv6AddressValid)
-                    {   
-                        if(addressList.Where(x=> x.AddressFamily == AddressFamily.InterNetworkV6).Any(x => x.ToString() == ipv6Address))
+                    {
+                        if (addressList.Where(x => x.AddressFamily == AddressFamily.InterNetworkV6)
+                            .Any(x => x.ToString() == ipv6Address))
+                        {
+                            Console.WriteLine($"IPv6 address already up to date for {subDomain}.{_config.Domain} : {ipv6Address}");
                             continue;
+                        }
                         Console.WriteLine($"Updating IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
 
                         var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv6Address,
@@ -75,8 +79,12 @@ public class Updater : BackgroundService
 
                     if (_config.IPv4 && ipv4AddressValid)
                     {
-                        if(addressList.Where(x=> x.AddressFamily == AddressFamily.InterNetwork).Any(x => x.ToString() == ipv4Address))
+                        if (addressList.Where(x => x.AddressFamily == AddressFamily.InterNetwork)
+                            .Any(x => x.ToString() == ipv4Address))
+                        {
+                            Console.WriteLine($"IPv4 address already up to date for {subDomain}.{_config.Domain} : {ipv4Address}");
                             continue;
+                        }
                         Console.WriteLine($"Updating IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
                         var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv4Address,
                             RecordType.A);
@@ -87,7 +95,7 @@ public class Updater : BackgroundService
                 }
             }
 
-            await Task.Delay(_config.Interval, stoppingToken);
+            await Task.Delay(_config.Interval*1000, stoppingToken);
         }
     }
 
