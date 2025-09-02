@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using PowerDnsApi;
@@ -16,13 +18,15 @@ namespace OpenDDNSLib.Driver.Provider
         public PowerDns(HttpClient httpClient, string baseUrl, string apiKey, string server)
         {
             _httpClient = httpClient;
-            _api = new PowerDnsApi.PowerDnsApi(_httpClient);
-            _api.BaseUrl = baseUrl;
+            _api = new PowerDnsApi.PowerDnsApi(_httpClient)
+            {
+                BaseUrl = baseUrl
+            };
             _server = server;
             _apiKey = apiKey;
 
         }
-        public async Task<bool> UpdateRecord(string domainName, string subdomainName, string ipAddress, RecordType recordType)
+        public async Task<bool> UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
         {
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
             try
@@ -31,17 +35,17 @@ namespace OpenDDNSLib.Driver.Provider
                 {
                     Rrsets = new List<RRSet>()
                     {
-                        new RRSet()
+                        new()
                         {
                             Name = $"{(subdomainName is not ("@" or "") ? subdomainName+"." : "")}{domainName}.",
-                            Type = recordType == RecordType.A ? "A" : "AAAA",
+                            Type = ipAddress.AddressFamily == AddressFamily.InterNetwork ? "A" : "AAAA",
                             Ttl = 300,
                             Changetype = "REPLACE",
                             Records =
                             {
                                 new Record()
                                 {
-                                    Content = ipAddress,
+                                    Content = ipAddress.ToString(),
                                     Disabled = false,
                                 }
                             }

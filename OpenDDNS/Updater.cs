@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenDDNS.Model;
 using OpenDDNSLib.Driver.Provider;
-
-using OpenDDNS.Model;
-using OpenDDNSLib;
-using YamlDotNet.Serialization;
 using System.Net;
+using System.Net.Sockets;
+using YamlDotNet.Serialization;
+using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns;
 
 namespace OpenDDNS
 {
@@ -19,96 +14,125 @@ namespace OpenDDNS
         private readonly HttpClient _httpClient;
         private readonly IProvider? _provider;
         private readonly Configuration _config;
+        private readonly ILogger _logger;
         private const string _configurationFile = "config.yaml";
-        public Updater(HttpClient httpClient)
+        public Updater(HttpClient httpClient, ILogger<Updater> logger)
         {
             _httpClient = httpClient;
-
-            var deserializer = new Deserializer();
+            _logger = logger;
+            var deserializer = new DeserializerBuilder()
+                .WithCaseInsensitivePropertyMatching()
+                .Build();
             _config = deserializer.Deserialize<Configuration>(File.ReadAllText(_configurationFile));
             _provider = GetProvider(_config);
 
         }
 
-        IProvider? GetProvider(Configuration config)
+        private IProvider? GetProvider(Configuration config)
         {
-            IProvider? provider = config.Provider switch
-            {
-                "rfc2136" => new Rfc2136(),
-                "pdns" => new PowerDns(_httpClient, config.ExtraParameters[0], config.Password, config.ExtraParameters[1]),
-                _ => null
-            };
-
-            return provider;
+            if (config.PowerDns != null)
+                return new PowerDns(_httpClient, config.PowerDns.EndPoint, config.PowerDns.ApiKey, config.PowerDns.ServerId);
+            return null;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             if (_provider == null)
             {
-                Console.WriteLine("Invalid provider");
+                _logger.LogError("Invalid provider");
             }
 
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                var ipv4Address = await GetIpAddress(_config.IPV4Resolver);
-                var ipv6Address = await GetIpAddress(_config.IPv6Resolver);
+                if (_config.Ipv4)
+                {
 
-                if (ipv4Address == "" && ipv6Address == "")
-                {
-                    Console.WriteLine("Failed to get IP address");
-                }
-                else
-                {
-                    var ipv4AddressValid = IPAddress.TryParse(ipv4Address, out IPAddress parsedIP) &&
-                                           parsedIP.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
-                    var ipv6AddressValid = IPAddress.TryParse(ipv6Address, out parsedIP) &&
-                                           parsedIP.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
-                    foreach (var subDomain in _config.SubDomain)
+                    var ipAddress = await GetIpv4Address();
+                    if (ipAddress == null)
                     {
-                        if (_config.IPv6 && ipv6AddressValid)
-                        {
-                            Console.WriteLine($"Updating IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
+                        _logger.LogError("Invalid IPv4 Address");
 
-                            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv6Address,
-                                RecordType.AAAA);
-
-                            Console.WriteLine(res
-                                ? $"Updated IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}"
-                                : $"Failed to update IPv6 for {subDomain}.{_config.Domain} : {ipv6Address}");
-                        }
-
-                        if (_config.IPv4 && ipv4AddressValid)
-                        {
-                            Console.WriteLine($"Updating IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
-                            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipv4Address,
-                                RecordType.A);
-                            Console.WriteLine(res
-                                ? $"Updated IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}"
-                                : $"Failed to update IPv4 for {subDomain}.{_config.Domain} : {ipv4Address}");
-                        }
                     }
+                    else
+                        await UpdateDomain(ipAddress);
                 }
+                if (_config.Ipv6)
+                {
 
-                await Task.Delay(60000, stoppingToken);
+                    var ipAddress = await GetIpv6Address();
+                    if (ipAddress == null)
+                    {
+                        _logger.LogError("Invalid IPv6 Address");
+
+                    }
+                    else
+                        await UpdateDomain(ipAddress);
+                }
+                await Task.Delay(_config.Interval * 60000, stoppingToken);
             }
 
         }
 
+        private async Task UpdateDomain(IPAddress ipAddress)
+        {
+            foreach (var subDomain in _config.SubDomain)
+            {
+                var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
+                if (res)
+                    _logger.LogInformation(
+                    $"Updated {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
+                else
+                    _logger.LogError($"Failed to update {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
+            }
+        }
         private async Task<string> GetIpAddress(string resolver)
         {
             HttpResponseMessage response;
             try
             {
                 response = await _httpClient.GetAsync(resolver);
+                return await response.Content.ReadAsStringAsync();
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                _logger.LogError(e.ToString());
                 return "";
             }
-            return await response.Content.ReadAsStringAsync();
+
+        }
+
+        private async Task<IPAddress?> GetIpv6Address()
+        {
+            var ipString = await GetIpAddress(_config.Ipv6Resolver);
+            try
+            {
+                var ipAddress = IPAddress.Parse(ipString);
+                return ipAddress;
+
+            }
+            catch (FormatException e)
+            {
+                _logger.LogError($"Failed to parse ipv6: {e}");
+            }
+
+            return null;
+        }
+        private async Task<IPAddress?> GetIpv4Address()
+        {
+            var ipString = await GetIpAddress(_config.Ipv4Resolver);
+            try
+            {
+                var ipAddress = IPAddress.Parse(ipString);
+                return ipAddress;
+
+            }
+            catch (FormatException e)
+            {
+                _logger.LogError($"Failed to parse ipv4: {e}");
+            }
+
+            return null;
         }
     }
 }
