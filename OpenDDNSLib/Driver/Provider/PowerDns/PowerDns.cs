@@ -1,7 +1,7 @@
 ﻿using PowerDnsApi;
 using System.Net;
 using System.Net.Sockets;
-namespace OpenDDNSLib.Driver.Provider
+namespace OpenDDNSLib.Driver.Provider.PowerDns
 {
     public class PowerDns : IProvider
     {
@@ -27,7 +27,7 @@ namespace OpenDDNSLib.Driver.Provider
             {
                 Zone zone = new()
                 {
-                    Rrsets = new List<RRSet>()
+                    Rrsets = new List<RRSet>
                     {
                         new()
                         {
@@ -37,7 +37,7 @@ namespace OpenDDNSLib.Driver.Provider
                             Changetype = "REPLACE",
                             Records =
                             {
-                                new Record()
+                                new Record
                                 {
                                     Content = ipAddress.ToString(),
                                     Disabled = false,

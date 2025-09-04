@@ -1,12 +1,12 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using DnsClient;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenDDNS.Model;
 using OpenDDNSLib.Driver.Provider;
 using System.Net;
 using System.Net.Sockets;
 using YamlDotNet.Serialization;
-using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns;
-
+using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns.PowerDns;
 namespace OpenDDNS
 {
     public class Updater : BackgroundService
@@ -45,46 +45,66 @@ namespace OpenDDNS
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                IPAddress? ipv4Address = null;
+                IPAddress? ipv6Address = null;
                 if (_config.Ipv4)
-                {
-
-                    var ipAddress = await GetIpv4Address();
-                    if (ipAddress == null)
-                    {
-                        _logger.LogError("Invalid IPv4 Address");
-
-                    }
-                    else
-                        await UpdateDomain(ipAddress);
-                }
+                    ipv4Address = await GetIpv4Address();
                 if (_config.Ipv6)
+                    ipv6Address = await GetIpv6Address();
+                foreach (var subDomain in _config.SubDomains)
                 {
-
-                    var ipAddress = await GetIpv6Address();
-                    if (ipAddress == null)
+                    if (_config.Ipv4)
                     {
-                        _logger.LogError("Invalid IPv6 Address");
+                        var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.A);
+                        if (ipv4Address == null)
+                        {
+                            _logger.LogError("Invalid IPv4 Address");
 
+                        }
+                        else if (!currentIpAddresses.Any(ipv4Address.Equals))
+                            await UpdateDomain(ipv4Address, subDomain);
                     }
-                    else
-                        await UpdateDomain(ipAddress);
+
+                    if (_config.Ipv6)
+                    {
+                        var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.AAAA);
+                        _logger.LogInformation($"Current ip: {ipv6Address}");
+                        if (ipv6Address == null)
+                        {
+                            _logger.LogError("Invalid IPv6 Address");
+                        }
+                        else if (!currentIpAddresses.Any(ipv6Address.Equals))
+                            await UpdateDomain(ipv6Address, subDomain);
+                    }
                 }
+
                 await Task.Delay(_config.Interval * 60000, stoppingToken);
             }
 
         }
-
-        private async Task UpdateDomain(IPAddress ipAddress)
+        private async Task<List<IPAddress>> ResolveDomain(string domainName, QueryType queryType)
         {
-            foreach (var subDomain in _config.SubDomain)
-            {
-                var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
-                if (res)
-                    _logger.LogInformation(
-                    $"Updated {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
-                else
-                    _logger.LogError($"Failed to update {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
-            }
+            var dnsServers = _config.DnsServers.Select(ip => new IPEndPoint(IPAddress.Parse(ip), 53)).ToArray();
+            var clientOptions = new LookupClientOptions(dnsServers);
+            var client = new LookupClient(clientOptions);
+            var result = await client.QueryAsync(domainName, queryType);
+
+            if (queryType == QueryType.A)
+                return result.Answers.ARecords().Select(a => a.Address).ToList();
+            else
+                return result.Answers.AaaaRecords().Select(a => a.Address).ToList();
+        }
+
+        private async Task UpdateDomain(IPAddress ipAddress, string subDomain)
+        {
+
+            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
+            if (res)
+                _logger.LogInformation(
+                $"Updated {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
+            else
+                _logger.LogError($"Failed to update {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
+
         }
         private async Task<string> GetIpAddress(string resolver)
         {
@@ -108,12 +128,13 @@ namespace OpenDDNS
             try
             {
                 var ipAddress = IPAddress.Parse(ipString);
+                _logger.LogInformation($"IPAddress{ipAddress}");
                 return ipAddress;
 
             }
             catch (FormatException e)
             {
-                _logger.LogError($"Failed to parse ipv6: {e}");
+                _logger.LogError(e, "Failed to parse IPv6: {ipString}", ipString);
             }
 
             return null;
@@ -124,15 +145,18 @@ namespace OpenDDNS
             try
             {
                 var ipAddress = IPAddress.Parse(ipString);
+                _logger.LogInformation($"IPAddress{ipAddress}");
                 return ipAddress;
 
             }
             catch (FormatException e)
             {
-                _logger.LogError($"Failed to parse ipv4: {e}");
+
+                _logger.LogError(e, "Failed to parse IPv4: {ipString}", ipString);
             }
 
             return null;
         }
+
     }
 }
