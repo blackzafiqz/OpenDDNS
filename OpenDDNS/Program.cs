@@ -16,6 +16,4 @@ namespace OpenDDNS
             await host.RunAsync();
         }
     }
-
-
 }

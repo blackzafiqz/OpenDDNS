@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using PowerDnsApi;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-using PowerDnsApi;
-using YamlDotNet.Serialization;
 namespace OpenDDNSLib.Driver.Provider
 {
     public class PowerDns : IProvider
