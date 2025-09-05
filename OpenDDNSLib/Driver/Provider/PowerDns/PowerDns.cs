@@ -1,62 +1,58 @@
 ﻿using OpenDDNSLib.Exception;
-using PowerDnsApi;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 
 namespace OpenDDNSLib.Driver.Provider.PowerDns
 {
     public class PowerDns : IProvider
     {
-        private readonly PowerDnsApi.PowerDnsApi _api;
         private readonly string _server;
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         public PowerDns(HttpClient httpClient, string baseUrl, string apiKey, string server)
         {
             _httpClient = httpClient;
-            _api = new PowerDnsApi.PowerDnsApi(_httpClient)
-            {
-                BaseUrl = baseUrl
-            };
+            _httpClient.BaseAddress = new Uri(baseUrl.Last() == '/' ? baseUrl : $"{baseUrl}/");
             _server = server;
             _apiKey = apiKey;
 
         }
         public async Task UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
         {
-            _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
+
             try
             {
-                Zone zone = new()
+                var rrSets = new List<RRSet>
                 {
-                    Rrsets = new List<RRSet>
+                    new()
                     {
-                        new()
+                        Name = $"{(subdomainName is not ("@" or "") ? subdomainName + "." : "")}{domainName}.",
+                        Type = ipAddress.AddressFamily == AddressFamily.InterNetwork ? "A" : "AAAA",
+                        Ttl = 300,
+                        Changetype = "REPLACE",
+                        Records =
                         {
-                            Name = $"{(subdomainName is not ("@" or "") ? subdomainName+"." : "")}{domainName}.",
-                            Type = ipAddress.AddressFamily == AddressFamily.InterNetwork ? "A" : "AAAA",
-                            Ttl = 300,
-                            Changetype = "REPLACE",
-                            Records =
+                            new Record
                             {
-                                new Record
-                                {
-                                    Content = ipAddress.ToString(),
-                                    Disabled = false,
-                                }
+                                Content = ipAddress.ToString(),
+                                Disabled = false,
                             }
                         }
                     }
                 };
-                await _api.PatchZoneAsync(_server, domainName, zone);
+                var payload = new { rrsets = rrSets };
+                string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                content.Headers.Add("X-API-Key", _apiKey);
+                var res = await _httpClient.PatchAsync($"servers/{_server}/zones/{domainName}.", content);
+                res.EnsureSuccessStatusCode();
+
             }
-            catch (ApiException e)
+            catch (HttpRequestException e)
             {
                 throw new UpdateException(e.Message);
-            }
-            finally
-            {
-                _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
             }
         }
     }

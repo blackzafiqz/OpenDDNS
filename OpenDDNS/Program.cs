@@ -21,10 +21,13 @@ namespace OpenDDNS
                     options.SingleLine = true;
                     options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
                 });
-                logger.AddFilter(x => x == config.LogLevel);
+                logger.AddFilter(x => x >= config.LogLevel);
+#if !DEBUG
                 logger.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+
                 logger.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.None);
                 logger.AddFilter("Microsoft.Extensions.Hosting.Internal.Host", LogLevel.None);
+#endif
             });
             builder.Services.AddSingleton<Configuration>(config);
             builder.Services.AddHostedService<Updater>();
