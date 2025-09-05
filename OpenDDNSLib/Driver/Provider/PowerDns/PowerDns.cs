@@ -1,6 +1,8 @@
-﻿using PowerDnsApi;
+﻿using OpenDDNSLib.Exception;
+using PowerDnsApi;
 using System.Net;
 using System.Net.Sockets;
+
 namespace OpenDDNSLib.Driver.Provider.PowerDns
 {
     public class PowerDns : IProvider
@@ -20,7 +22,7 @@ namespace OpenDDNSLib.Driver.Provider.PowerDns
             _apiKey = apiKey;
 
         }
-        public async Task<bool> UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
+        public async Task UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
         {
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
             try
@@ -50,20 +52,12 @@ namespace OpenDDNSLib.Driver.Provider.PowerDns
             }
             catch (ApiException e)
             {
-                Console.WriteLine(e);
-                return false;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                return false;
+                throw new UpdateException(e.Message);
             }
             finally
             {
                 _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
             }
-
-            return true;
         }
     }
 }

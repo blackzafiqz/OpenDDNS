@@ -9,6 +9,6 @@ namespace OpenDDNSLib.Driver.Provider
 {
     public interface IProvider
     {
-        public Task<bool> UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress);
+        public Task UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress);
     }
 }

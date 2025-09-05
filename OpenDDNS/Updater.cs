@@ -3,9 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenDDNS.Model;
 using OpenDDNSLib.Driver.Provider;
+using OpenDDNSLib.Exception;
 using System.Net;
 using System.Net.Sockets;
-using YamlDotNet.Serialization;
 using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns.PowerDns;
 namespace OpenDDNS
 {
@@ -15,15 +15,13 @@ namespace OpenDDNS
         private readonly IProvider? _provider;
         private readonly Configuration _config;
         private readonly ILogger _logger;
-        private const string _configurationFile = "config.yaml";
-        public Updater(HttpClient httpClient, ILogger<Updater> logger)
+
+        public Updater(HttpClient httpClient, ILogger<Updater> logger, Configuration config)
         {
             _httpClient = httpClient;
             _logger = logger;
-            var deserializer = new DeserializerBuilder()
-                .WithCaseInsensitivePropertyMatching()
-                .Build();
-            _config = deserializer.Deserialize<Configuration>(File.ReadAllText(_configurationFile));
+            _config = config;
+
             _provider = GetProvider(_config);
 
         }
@@ -39,7 +37,7 @@ namespace OpenDDNS
         {
             if (_provider == null)
             {
-                _logger.LogError("Invalid provider");
+                _logger.LogCritical("Invalid provider");
             }
 
 
@@ -58,23 +56,30 @@ namespace OpenDDNS
                         var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.A);
                         if (ipv4Address == null)
                         {
+
                             _logger.LogError("Invalid IPv4 Address");
 
                         }
                         else if (!currentIpAddresses.Any(ipv4Address.Equals))
+                        {
+                            _logger.LogDebug("Current IPv4: {ipAddress}", ipv4Address.ToString());
                             await UpdateDomain(ipv4Address, subDomain);
+                        }
                     }
 
                     if (_config.Ipv6)
                     {
                         var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.AAAA);
-                        _logger.LogInformation($"Current ip: {ipv6Address}");
+
                         if (ipv6Address == null)
                         {
                             _logger.LogError("Invalid IPv6 Address");
                         }
                         else if (!currentIpAddresses.Any(ipv6Address.Equals))
+                        {
+                            _logger.LogDebug("Current IPv6: {ipAddress}", ipv6Address.ToString());
                             await UpdateDomain(ipv6Address, subDomain);
+                        }
                     }
                 }
 
@@ -89,29 +94,40 @@ namespace OpenDDNS
             var client = new LookupClient(clientOptions);
             var result = await client.QueryAsync(domainName, queryType);
 
-            if (queryType == QueryType.A)
-                return result.Answers.ARecords().Select(a => a.Address).ToList();
-            else
-                return result.Answers.AaaaRecords().Select(a => a.Address).ToList();
+            return queryType == QueryType.A ? result.Answers.ARecords().Select(a => a.Address).ToList() : result.Answers.AaaaRecords().Select(a => a.Address).ToList();
         }
 
         private async Task UpdateDomain(IPAddress ipAddress, string subDomain)
         {
-
-            var res = await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
-            if (res)
-                _logger.LogInformation(
-                $"Updated {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
-            else
-                _logger.LogError($"Failed to update {(ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} for {subDomain}.{_config.Domain} : {ipAddress.ToString()}");
-
-        }
-        private async Task<string> GetIpAddress(string resolver)
-        {
-            HttpResponseMessage response;
             try
             {
-                response = await _httpClient.GetAsync(resolver);
+                await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
+                _logger.LogInformation(
+                    "Updated {ipType} for {subDomain}.{domain} : {ipAddress}",
+                    ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6", subDomain,
+                    _config.Domain, ipAddress.ToString());
+
+            }
+            catch (UpdateException e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogError("Failed to update {ipType} for {subDomain}.{domain} : {ipAddress}",
+                    ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6",
+                    subDomain, _config.Domain, ipAddress.ToString());
+            }
+            catch (Exception e)
+            {
+
+                _logger.LogError(e.Message);
+            }
+        }
+
+        private async Task<string> GetIpAddress(string resolver)
+        {
+
+            try
+            {
+                var response = await _httpClient.GetAsync(resolver);
                 return await response.Content.ReadAsStringAsync();
             }
             catch (Exception e)
@@ -128,7 +144,7 @@ namespace OpenDDNS
             try
             {
                 var ipAddress = IPAddress.Parse(ipString);
-                _logger.LogInformation($"IPAddress{ipAddress}");
+                _logger.LogDebug("Detected IPv6: {ipAddress}", ipAddress.ToString());
                 return ipAddress;
 
             }
@@ -145,7 +161,7 @@ namespace OpenDDNS
             try
             {
                 var ipAddress = IPAddress.Parse(ipString);
-                _logger.LogInformation($"IPAddress{ipAddress}");
+                _logger.LogDebug("Detected IPv4: {ipAddress}", ipAddress.ToString());
                 return ipAddress;
 
             }

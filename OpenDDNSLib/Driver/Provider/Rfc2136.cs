@@ -9,7 +9,7 @@ namespace OpenDDNSLib.Driver.Provider
 {
     public class Rfc2136 : IProvider
     {
-        public Task<bool> UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
+        public Task UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
         {
             throw new NotImplementedException();
         }

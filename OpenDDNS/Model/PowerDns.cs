@@ -1,6 +1,6 @@
 ﻿namespace OpenDDNS.Model
 {
-    internal class PowerDns
+    public class PowerDns
     {
         public required string ApiKey { get; set; }
         public required string EndPoint { get; set; }
