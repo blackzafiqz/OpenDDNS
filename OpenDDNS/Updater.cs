@@ -7,6 +7,7 @@ using OpenDDNSLib.Exception;
 using System.Net;
 using System.Net.Sockets;
 using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns.PowerDns;
+using Rfc2136 = OpenDDNSLib.Driver.Provider.Rfc2136.Rfc2136;
 namespace OpenDDNS
 {
     public class Updater : BackgroundService
@@ -22,25 +23,34 @@ namespace OpenDDNS
             _logger = logger;
             _config = config;
 
-            _provider = GetProvider(_config);
+            try
+            {
+                _provider = GetProvider(_config);
+            }
+            catch (InvalidOperationException e)
+            {
+                _provider = null;
+                _logger.LogCritical(e.Message);
+            }
 
         }
 
-        private IProvider? GetProvider(Configuration config)
-        {
-            if (config.PowerDns != null)
-                return new PowerDns(_httpClient, config.PowerDns.EndPoint, config.PowerDns.ApiKey, config.PowerDns.ServerId);
-            return null;
-        }
+        private IProvider GetProvider(Configuration config) =>
+            config switch
+            {
+                { PowerDns: { } pdns } =>
+                    new PowerDns(_httpClient, _config.Ttl, pdns.EndPoint, pdns.ApiKey, pdns.ServerId),
+
+                { Rfc2136: { } rfc2136 } =>
+                    new Rfc2136(_config.Ttl, rfc2136.Name, rfc2136.Key, rfc2136.Server, rfc2136.Algorithm),
+
+                _ => throw new InvalidOperationException("No valid DNS provider configured in config.yaml")
+            };
+
+
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (_provider == null)
-            {
-                _logger.LogCritical("Invalid provider");
-            }
-
-
             while (!stoppingToken.IsCancellationRequested)
             {
                 IPAddress? ipv4Address = null;

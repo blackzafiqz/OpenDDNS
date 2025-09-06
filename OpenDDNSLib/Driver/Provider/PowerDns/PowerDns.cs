@@ -11,12 +11,14 @@ namespace OpenDDNSLib.Driver.Provider.PowerDns
         private readonly string _server;
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
-        public PowerDns(HttpClient httpClient, string baseUrl, string apiKey, string server)
+        private readonly int _ttl;
+        public PowerDns(HttpClient httpClient,int ttl, string baseUrl, string apiKey, string server)
         {
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri(baseUrl.Last() == '/' ? baseUrl : $"{baseUrl}/");
             _server = server;
             _apiKey = apiKey;
+            _ttl=ttl;
 
         }
         public async Task UpdateRecord(string domainName, string subdomainName, IPAddress ipAddress)
@@ -30,7 +32,7 @@ namespace OpenDDNSLib.Driver.Provider.PowerDns
                     {
                         Name = $"{(subdomainName is not ("@" or "") ? subdomainName + "." : "")}{domainName}.",
                         Type = ipAddress.AddressFamily == AddressFamily.InterNetwork ? "A" : "AAAA",
-                        Ttl = 300,
+                        Ttl = _ttl,
                         Changetype = "REPLACE",
                         Records =
                         {
