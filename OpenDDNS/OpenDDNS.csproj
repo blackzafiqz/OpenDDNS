@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <Title>OpenDDNS</Title>
+	  <Authors>Muhammad Afiq</Authors>
+    <RepositoryUrl>https://github.com/blackzafiqz/OpenDDNS</RepositoryUrl>
   </PropertyGroup>
 
 

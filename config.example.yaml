@@ -1,0 +1,29 @@
+Domain: example.com
+SubDomains:
+  - "@"  # root domain
+  - "" # root domain
+  - www
+# Enable update for IPv4
+IPv6: true
+# Enable update for IPv6
+IPv4: true
+
+# Information / Debug
+LogLevel: Information
+DnsServers:
+  - 172.104.53.29
+ 
+# Pick a provider
+PowerDns:
+  ApiKey: secretKey
+  EndPoint: https://api.dns.example.com/api/v1/
+  ServerId: localhost
+
+Rfc2136:
+  Name: keyName
+  Key: sdfkmlkklmasldkddcalskdcldddddklldl==
+  # Possible values for algorithm are:
+  # Md5, Sha1, Sha224, Sha256, Sha384, Sha512,
+  # Sha256_128, Sha384_192, Sha512_256
+  Algorithm: sha512
+  Server: 172.104.53.29
