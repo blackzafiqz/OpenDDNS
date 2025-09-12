@@ -8,8 +8,7 @@ namespace OpenDDNS.Model
     public class Configuration
     {
         private static readonly string _configurationFile = "config.yaml";
-        public required string Domain { get; set; }
-        public required List<string> SubDomains { get; set; }
+        public required List<Domain> Domains { get; set; }
         public int Ttl { get; set; } = 300;
         public List<string> DnsServers { get; set; } = new() { "1.1.1.1", "8.8.8.8" };
         public int Interval { get; set; } = 5;

@@ -13,7 +13,7 @@ namespace OpenDDNS
     public class Updater : BackgroundService
     {
         private readonly HttpClient _httpClient;
-        private readonly IProvider? _provider;
+        private readonly List<IProvider> _providers;
         private readonly Configuration _config;
         private readonly ILogger _logger;
 
@@ -25,27 +25,49 @@ namespace OpenDDNS
 
             try
             {
-                _provider = GetProvider(_config);
+                _providers = GetProviders(_config);
             }
             catch (InvalidOperationException e)
             {
-                _provider = null;
                 _logger.LogCritical(e.Message);
             }
 
         }
 
-        private IProvider GetProvider(Configuration config) =>
-            config switch
+        private List<IProvider> GetProviders(Configuration config)
+        {
+            var providers = new List<IProvider>();
+
+            if (config.PowerDns is { } pdns)
             {
-                { PowerDns: { } pdns } =>
-                    new PowerDns(_httpClient, _config.Ttl, pdns.EndPoint, pdns.ApiKey, pdns.ServerId),
+                providers.Add(new PowerDns(
+                    _httpClient,
+                    _config.Ttl,
+                    pdns.EndPoint,
+                    pdns.ApiKey,
+                    pdns.ServerId
+                ));
+            }
 
-                { Rfc2136: { } rfc2136 } =>
-                    new Rfc2136(_config.Ttl, rfc2136.Name, rfc2136.Key, rfc2136.Server, rfc2136.Algorithm),
+            if (config.Rfc2136 is { } rfc2136)
+            {
+                providers.Add(new Rfc2136(
+                    _config.Ttl,
+                    rfc2136.Name,
+                    rfc2136.Key,
+                    rfc2136.Server,
+                    rfc2136.Algorithm
+                ));
+            }
 
-                _ => throw new InvalidOperationException("No valid DNS provider configured in config.yaml")
-            };
+            if (providers.Count == 0)
+            {
+                throw new InvalidOperationException("No valid DNS providers configured in config.yaml");
+            }
+
+            return providers;
+        }
+
 
 
 
@@ -59,36 +81,42 @@ namespace OpenDDNS
                     ipv4Address = await GetIpv4Address();
                 if (_config.Ipv6)
                     ipv6Address = await GetIpv6Address();
-                foreach (var subDomain in _config.SubDomains)
+                foreach (var domain in _config.Domains)
                 {
-                    if (_config.Ipv4)
+
+
+                    foreach (var subDomain in domain.SubDomains)
                     {
-                        var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.A);
-                        if (ipv4Address == null)
+                        if (_config.Ipv4)
                         {
+                            var currentIpAddresses = await ResolveDomain($"{subDomain}.{domain.Name}", QueryType.A);
+                            if (ipv4Address == null)
+                            {
 
-                            _logger.LogError("Invalid IPv4 Address");
+                                _logger.LogError("Invalid IPv4 Address");
 
+                            }
+                            else if (!currentIpAddresses.Any(ipv4Address.Equals))
+                            {
+                                _logger.LogDebug("Current IPv4: {ipAddress}", ipv4Address.ToString());
+                                await UpdateDomain(ipv4Address, domain.Name, subDomain);
+                            }
                         }
-                        else if (!currentIpAddresses.Any(ipv4Address.Equals))
-                        {
-                            _logger.LogDebug("Current IPv4: {ipAddress}", ipv4Address.ToString());
-                            await UpdateDomain(ipv4Address, subDomain);
-                        }
-                    }
 
-                    if (_config.Ipv6)
-                    {
-                        var currentIpAddresses = await ResolveDomain($"{subDomain}.{_config.Domain}", QueryType.AAAA);
+                        if (_config.Ipv6)
+                        {
+                            var currentIpAddresses =
+                                await ResolveDomain($"{subDomain}.{domain.Name}", QueryType.AAAA);
 
-                        if (ipv6Address == null)
-                        {
-                            _logger.LogError("Invalid IPv6 Address");
-                        }
-                        else if (!currentIpAddresses.Any(ipv6Address.Equals))
-                        {
-                            _logger.LogDebug("Current IPv6: {ipAddress}", ipv6Address.ToString());
-                            await UpdateDomain(ipv6Address, subDomain);
+                            if (ipv6Address == null)
+                            {
+                                _logger.LogError("Invalid IPv6 Address");
+                            }
+                            else if (!currentIpAddresses.Any(ipv6Address.Equals))
+                            {
+                                _logger.LogDebug("Current IPv6: {ipAddress}", ipv6Address.ToString());
+                                await UpdateDomain(ipv6Address, domain.Name, subDomain);
+                            }
                         }
                     }
                 }
@@ -107,23 +135,27 @@ namespace OpenDDNS
             return queryType == QueryType.A ? result.Answers.ARecords().Select(a => a.Address).ToList() : result.Answers.AaaaRecords().Select(a => a.Address).ToList();
         }
 
-        private async Task UpdateDomain(IPAddress ipAddress, string subDomain)
+        private async Task UpdateDomain(IPAddress ipAddress, string domain, string subDomain)
         {
             try
             {
-                await _provider!.UpdateRecord(_config.Domain, subDomain, ipAddress);
-                _logger.LogInformation(
-                    "Updated {ipType} for {subDomain}.{domain} : {ipAddress}",
-                    ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6", subDomain,
-                    _config.Domain, ipAddress.ToString());
+                foreach (var provider in _providers)
+                {
 
+
+                    await provider.UpdateRecord(domain, subDomain, ipAddress);
+                    _logger.LogInformation(
+                        "Updated {ipType} for {subDomain}.{domain} : {ipAddress}",
+                        ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6", subDomain,
+                        domain, ipAddress.ToString());
+                }
             }
             catch (UpdateException e)
             {
                 _logger.LogError(e.Message);
                 _logger.LogError("Failed to update {ipType} for {subDomain}.{domain} : {ipAddress}",
                     ipAddress.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6",
-                    subDomain, _config.Domain, ipAddress.ToString());
+                    subDomain, domain, ipAddress.ToString());
             }
             catch (Exception e)
             {
