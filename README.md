@@ -8,16 +8,17 @@ cp config.example.yaml config.yaml
 General Configuration
 The following sections, all providers must have.
 ```
-# Required configuration
+# Required
 # The domain to update, required it is.
-Domain: example.com
-# The subdomains to update, a list of strings, it must be.
-SubDomains:
-  - "@"  # root domain
-  - ""   # root domain
-  - wwww
+Domains:
+  - Name: example.com
+    # The subdomains to update, a list of strings, it must be.
+    SubDomains:
+      - "@"  # root domain
+      - "" # root domain
+      - www
 
-# Optional configuration
+# Optional
 # Time-to-live for DNS records, in seconds. Default is 300.
 Ttl: 300
 # List of DNS servers to use. Default are "1.1.1.1" and "8.8.8.8".
@@ -61,4 +62,10 @@ Rfc2136:
   Algorithm: sha512
   Server: 172.104.53.29
 
+```
+### Cloudflare
+```
+Cloudflare:
+    Apitoken: jksdavjn3kasdvjmnsjjhfhj3kk
+    Proxied: false
 ```

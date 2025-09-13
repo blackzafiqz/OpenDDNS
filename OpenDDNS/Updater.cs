@@ -6,8 +6,10 @@ using OpenDDNSLib.Driver.Provider;
 using OpenDDNSLib.Exception;
 using System.Net;
 using System.Net.Sockets;
+using OpenDDNSLib.Driver.Provider.Cloudflare;
 using PowerDns = OpenDDNSLib.Driver.Provider.PowerDns.PowerDns;
 using Rfc2136 = OpenDDNSLib.Driver.Provider.Rfc2136.Rfc2136;
+using Cloudflare = OpenDDNSLib.Driver.Provider.Cloudflare.Cloudflare;
 namespace OpenDDNS
 {
     public class Updater : BackgroundService
@@ -60,6 +62,10 @@ namespace OpenDDNS
                 ));
             }
 
+            if (config.Cloudflare is { } cf)
+            {
+                providers.Add(new Cloudflare(_httpClient,_config.Ttl,cf.ApiToken,cf.Proxied));
+            }
             if (providers.Count == 0)
             {
                 throw new InvalidOperationException("No valid DNS providers configured in config.yaml");

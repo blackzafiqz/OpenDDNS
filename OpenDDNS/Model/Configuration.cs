@@ -18,6 +18,7 @@ namespace OpenDDNS.Model
         public string Ipv6Resolver { get; set; } = "https://api64.ipify.org";
         public PowerDns? PowerDns { get; set; }
         public Rfc2136? Rfc2136 { get; set; }
+        public Cloudflare? Cloudflare { get; set; }
         public LogLevel LogLevel { get; set; } = LogLevel.Information;
 
 

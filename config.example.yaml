@@ -1,8 +1,9 @@
-Domain: example.com
-SubDomains:
-  - "@"  # root domain
-  - "" # root domain
-  - www
+Domains:
+  - Name: example.com
+    SubDomains:
+      - "@"  # root domain
+      - "" # root domain
+      - www
 # Enable update for IPv4
 IPv6: true
 # Enable update for IPv6
@@ -27,3 +28,7 @@ Rfc2136:
   # Sha256_128, Sha384_192, Sha512_256
   Algorithm: sha512
   Server: 172.104.53.29
+
+Cloudflare:
+    Apitoken: jksdavjn3kasdvjmnsjjhfhj3kk
+    Proxied: false
